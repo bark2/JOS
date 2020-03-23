@@ -1,0 +1,61 @@
+[
+{
+  "directory": "/home/lab",
+  "command": "gcc -pipe -nostdinc -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_KERNEL -gstabs -c -o obj/kern/entrypgdir.o kern/entrypgdir.c",
+  "file": "/home/lab/kern/entrypgdir.c"
+}
+,
+{
+  "directory": "/home/lab",
+  "command": "gcc -pipe -nostdinc -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_KERNEL -gstabs -c -o obj/kern/init.o kern/init.c",
+  "file": "/home/lab/kern/init.c"
+}
+,
+{
+  "directory": "/home/lab",
+  "command": "gcc -pipe -nostdinc -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_KERNEL -gstabs -c -o obj/kern/console.o kern/console.c",
+  "file": "/home/lab/kern/console.c"
+}
+,
+{
+  "directory": "/home/lab",
+  "command": "gcc -pipe -nostdinc -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_KERNEL -gstabs -c -o obj/kern/monitor.o kern/monitor.c",
+  "file": "/home/lab/kern/monitor.c"
+}
+,
+{
+  "directory": "/home/lab",
+  "command": "gcc -pipe -nostdinc -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_KERNEL -gstabs -c -o obj/kern/printf.o kern/printf.c",
+  "file": "/home/lab/kern/printf.c"
+}
+,
+{
+  "directory": "/home/lab",
+  "command": "gcc -pipe -nostdinc -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_KERNEL -gstabs -c -o obj/kern/kdebug.o kern/kdebug.c",
+  "file": "/home/lab/kern/kdebug.c"
+}
+,
+{
+  "directory": "/home/lab",
+  "command": "gcc -pipe -nostdinc -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_KERNEL -gstabs -c -o obj/kern/printfmt.o lib/printfmt.c",
+  "file": "/home/lab/lib/printfmt.c"
+}
+,
+{
+  "directory": "/home/lab",
+  "command": "gcc -pipe -nostdinc -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_KERNEL -gstabs -c -o obj/kern/readline.o lib/readline.c",
+  "file": "/home/lab/lib/readline.c"
+}
+,
+{
+  "directory": "/home/lab",
+  "command": "gcc -pipe -nostdinc -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_KERNEL -gstabs -c -o obj/kern/string.o lib/string.c",
+  "file": "/home/lab/lib/string.c"
+}
+,
+{
+  "directory": "/home/lab",
+  "command": "gcc -pipe -nostdinc -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_KERNEL -gstabs -Os -c -o obj/boot/main.o boot/main.c",
+  "file": "/home/lab/boot/main.c"
+}
+]
