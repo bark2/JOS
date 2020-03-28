@@ -11,21 +11,20 @@
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
 
-#define CMDBUF_SIZE	80	// enough for one VGA text line
-
+#define CMDBUF_SIZE 80 // enough for one VGA text line
 
 struct Command {
 	const char *name;
 	const char *desc;
 	// return -1 to force monitor to exit
-	int (*func)(int argc, char** argv, struct Trapframe* tf);
+	int (*func)(int argc, char **argv, struct Trapframe *tf);
 };
 
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 };
-#define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
+#define NCOMMANDS (sizeof(commands) / sizeof(commands[0]))
 
 /***** Implementations of basic kernel monitor commands *****/
 
@@ -58,11 +57,28 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
-	// Your code here.
+	uintptr_t *ebp, *args;
+	uintptr_t eip, prev_ebp;
+	struct Eipdebuginfo info;
+
+	ebp = (uintptr_t *)(argc ? argc : read_ebp());
+	prev_ebp = ebp[0];
+	eip = ebp[1];
+	args = ebp + 2;
+	debuginfo_eip(eip, &info);
+
+	cprintf("ebp %08x  eip %08x  args  %08x %08x %08x %08x %08u\n", ebp,
+		eip, args[0], args[1], args[2], args[3], args[4]);
+	cprintf("\t%s:%u: %.*s+%u\n", info.eip_file,
+		info.eip_line, //  ine within that file of the stack frame's eip
+		info.eip_fn_namelen, info.eip_fn_name,
+		eip - info.eip_fn_addr // offset of the eip from the first instruction of the function
+	);
+
+	if (prev_ebp)
+		mon_backtrace((int)ebp[0], 0, 0);
 	return 0;
 }
-
-
 
 /***** Kernel monitor command interpreter *****/
 
@@ -87,7 +103,7 @@ runcmd(char *buf, struct Trapframe *tf)
 			break;
 
 		// save and scan past next arg
-		if (argc == MAXARGS-1) {
+		if (argc == MAXARGS - 1) {
 			cprintf("Too many arguments (max %d)\n", MAXARGS);
 			return 0;
 		}
@@ -115,7 +131,6 @@ monitor(struct Trapframe *tf)
 
 	cprintf("Welcome to the JOS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
-
 
 	while (1) {
 		buf = readline("K> ");
