@@ -68,7 +68,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	debuginfo_eip(eip, &info);
 
 	cprintf("ebp %08x  eip %08x  args  %08x %08x %08x %08x %08u\n", ebp,
-		eip, args[2], args[3], args[4], args[5], args[6]);
+		eip, args[0], args[1], args[2], args[3], args[4]);
 	cprintf("\t%s:%u: %.*s+%u\n", info.eip_file,
 		info.eip_line, //  ine within that file of the stack frame's eip
 		info.eip_fn_namelen, info.eip_fn_name,
