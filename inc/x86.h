@@ -266,6 +266,15 @@ read_esp(void)
 	return esp;
 }
 
+// read debug register 6
+static __inline uint32_t
+read_dr6(void)
+{
+	uint32_t dr6;
+	__asm __volatile("movl %%dr6,%0" : "=r"(dr6));
+	return dr6;
+}
+
 static __inline void
 cpuid(uint32_t info, uint32_t *eaxp, uint32_t *ebxp, uint32_t *ecxp,
       uint32_t *edxp)
