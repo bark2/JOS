@@ -168,6 +168,7 @@ env_setup_vm(struct Env *e)
 	// Allocate a page for the page directory
 	if (!(p = page_alloc(ALLOC_ZERO)))
 		return -E_NO_MEM;
+	
 
 	// Now, set e->env_pgdir and initialize the page directory.
 	//
@@ -359,12 +360,6 @@ load_icode(struct Env *e, uint8_t *binary)
 			continue;
 
 		region_alloc(e, (void *)ph->p_va, ph->p_memsz);
-		/* pte = pgdir_walk(e->env_pgdir, (void *)ph->p_va, 0); */
-		/* off_t offset = PGOFF(ph->p_va); */
-		/* pa = PTE_ADDR(*pte)+offset; */
-		/* cprintf("pa: %x,  kpa: %x\n", pa, PTE_ADDR(*pgdir_walk(kern_pgdir, KADDR(pa), 0))+offset); */
-		/* memset((void *)(KADDR(pa)), 0, ph->p_memsz); */
-		/* memcpy((void *)(KADDR(pa)), binary + ph->p_offset, ph->p_filesz); */
 		lcr3(PADDR(e->env_pgdir));
 		memset((void *)ph->p_va, 0, ph->p_memsz);
 		memcpy((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);

@@ -400,7 +400,9 @@ pfree(struct PageInfo *pp)
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
-	/* return palloc(0, alloc_flags); */
+	struct PageInfo *p = palloc(0, alloc_flags);
+	cprintf("new page: %d\n", p - pages);
+	return p;
 
 	struct PageInfo *result = page_free_list;
 	if (!result)
@@ -421,7 +423,7 @@ page_alloc(int alloc_flags)
 void
 page_free(struct PageInfo *pp)
 {
-	/* return pfree(pp); */
+	return pfree(pp);
 
 	assert(!pp->pp_ref);
 	pp->pp_link =
