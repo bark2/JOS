@@ -17,7 +17,6 @@
 
 static void boot_aps(void);
 
-
 void
 i386_init(void)
 {
@@ -31,8 +30,6 @@ i386_init(void)
 	// Initialize the console.
 	// Can't call cprintf until after we do this!
 	cons_init();
-
-	cprintf("6828 decimal is %o octal!\n", 6828);
 
 	// Lab 2 memory management initialization functions
 	mem_init();
@@ -50,6 +47,7 @@ i386_init(void)
 
 	// Acquire the big kernel lock before waking up APs
 	// Your code here:
+	lock_kernel();
 
 	// Starting non-boot CPUs
 	boot_aps();
@@ -59,11 +57,12 @@ i386_init(void)
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
 	// Touch all you want.
-	ENV_CREATE(user_primes, ENV_TYPE_USER);
+	ENV_CREATE(user_sendpage, ENV_TYPE_USER);
 #endif // TEST*
 
 	// Schedule and run the first user environment!
 	sched_yield();
+	unlock_kernel();
 }
 
 // While boot_aps is booting a given CPU, it communicates the per-core
@@ -85,15 +84,15 @@ boot_aps(void)
 
 	// Boot each AP one at a time
 	for (c = cpus; c < cpus + ncpu; c++) {
-		if (c == cpus + cpunum())  // We've started already.
+		if (c == cpus + cpunum()) // We've started already.
 			continue;
 
-		// Tell mpentry.S what stack to use 
+		// Tell mpentry.S what stack to use
 		mpentry_kstack = percpu_kstacks[c - cpus] + KSTKSIZE;
 		// Start the CPU at mpentry_start
 		lapic_startap(c->cpu_id, PADDR(code));
 		// Wait for the CPU to finish some basic setup in mp_main()
-		while(c->cpu_status != CPU_STARTED)
+		while (c->cpu_status != CPU_STARTED)
 			;
 	}
 }
@@ -102,7 +101,7 @@ boot_aps(void)
 void
 mp_main(void)
 {
-	// We are in high EIP now, safe to switch to kern_pgdir 
+	// We are in high EIP now, safe to switch to kern_pgdir
 	lcr3(PADDR(kern_pgdir));
 	cprintf("SMP: CPU %d starting\n", cpunum());
 
@@ -116,9 +115,8 @@ mp_main(void)
 	// only one CPU can enter the scheduler at a time!
 	//
 	// Your code here:
-
-	// Remove this after you finish Exercise 4
-	for (;;);
+	lock_kernel();
+	sched_yield();
 }
 
 /*
@@ -132,7 +130,7 @@ const char *panicstr;
  * It prints "panic: mesg", and then enters the kernel monitor.
  */
 void
-_panic(const char *file, int line, const char *fmt,...)
+_panic(const char *file, int line, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -157,7 +155,7 @@ dead:
 
 /* like panic, but don't */
 void
-_warn(const char *file, int line, const char *fmt,...)
+_warn(const char *file, int line, const char *fmt, ...)
 {
 	va_list ap;
 
