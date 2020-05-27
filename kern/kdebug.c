@@ -7,10 +7,10 @@
 #include <kern/pmap.h>
 #include <kern/env.h>
 
-extern const struct Stab __STAB_BEGIN__[];	// Beginning of stabs table
-extern const struct Stab __STAB_END__[];	// End of stabs table
-extern const char __STABSTR_BEGIN__[];		// Beginning of string table
-extern const char __STABSTR_END__[];		// End of string table
+extern const struct Stab __STAB_BEGIN__[]; // Beginning of stabs table
+extern const struct Stab __STAB_END__[];   // End of stabs table
+extern const char __STABSTR_BEGIN__[];	   // Beginning of string table
+extern const char __STABSTR_END__[];	   // End of string table
 
 struct UserStabData {
 	const struct Stab *stabs;
@@ -18,7 +18,6 @@ struct UserStabData {
 	const char *stabstr;
 	const char *stabstr_end;
 };
-
 
 // stab_binsearch(stabs, region_left, region_right, type, addr)
 //
@@ -68,7 +67,7 @@ stab_binsearch(const struct Stab *stabs, int *region_left, int *region_right,
 		// search for earliest stab with right type
 		while (m >= l && stabs[m].n_type != type)
 			m--;
-		if (m < l) {	// no match in [l, m]
+		if (m < l) { // no match in [l, m]
 			l = true_m + 1;
 			continue;
 		}
@@ -95,13 +94,11 @@ stab_binsearch(const struct Stab *stabs, int *region_left, int *region_right,
 	else {
 		// find rightmost region containing 'addr'
 		for (l = *region_right;
-		     l > *region_left && stabs[l].n_type != type;
-		     l--)
+		     l > *region_left && stabs[l].n_type != type; l--)
 			/* do nothing */;
 		*region_left = l;
 	}
 }
-
 
 // debuginfo_eip(addr, info)
 //
@@ -137,19 +134,27 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 		// to __STAB_BEGIN__, __STAB_END__, __STABSTR_BEGIN__, and
 		// __STABSTR_END__) in a structure located at virtual address
 		// USTABDATA.
-		const struct UserStabData *usd = (const struct UserStabData *) USTABDATA;
+		const struct UserStabData *usd =
+			(const struct UserStabData *)USTABDATA; //
 
 		// Make sure this memory is valid.
 		// Return -1 if it is not.  Hint: Call user_mem_check.
 		// LAB 3: Your code here.
+		if (user_mem_check(curenv, usd, sizeof(*usd), PTE_W) < 0)
+			return -1;
 
-		stabs = usd->stabs;
+		stabs = usd->stabs; //
 		stab_end = usd->stab_end;
-		stabstr = usd->stabstr;
+		stabstr = usd->stabstr; //
 		stabstr_end = usd->stabstr_end;
 
 		// Make sure the STABS and string table memory is valid.
 		// LAB 3: Your code here.
+		if (user_mem_check(curenv, stabs, stab_end - stabs, PTE_W) < 0)
+			return -1;
+		if (user_mem_check(curenv, stabstr, stabstr_end - stabstr,
+				   PTE_W) < 0)
+			return -1;
 	}
 
 	// String table validity checks
@@ -192,8 +197,8 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 		rline = rfile;
 	}
 	// Ignore stuff after the colon.
-	info->eip_fn_namelen = strfind(info->eip_fn_name, ':') - info->eip_fn_name;
-
+	info->eip_fn_namelen =
+		strfind(info->eip_fn_name, ':') - info->eip_fn_name;
 
 	// Search within [lline, rline] for the line number stab.
 	// If found, set info->eip_line to the right line number.
@@ -203,28 +208,26 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 	//	There's a particular stabs type used for line numbers.
 	//	Look at the STABS documentation and <inc/stab.h> to find
 	//	which one.
-	// Your code here.
-
+	stab_binsearch(stabs, &lline, &rline, N_SLINE, addr);
+	if (lline <= rline)
+		info->eip_line = stabs[lline].n_desc;
 
 	// Search backwards from the line number for the relevant filename
 	// stab.
 	// We can't just use the "lfile" stab because inlined functions
 	// can interpolate code from a different file!
 	// Such included source files use the N_SOL stab type.
-	while (lline >= lfile
-	       && stabs[lline].n_type != N_SOL
-	       && (stabs[lline].n_type != N_SO || !stabs[lline].n_value))
+	while (lline >= lfile && stabs[lline].n_type != N_SOL &&
+	       (stabs[lline].n_type != N_SO || !stabs[lline].n_value))
 		lline--;
 	if (lline >= lfile && stabs[lline].n_strx < stabstr_end - stabstr)
 		info->eip_file = stabstr + stabs[lline].n_strx;
-
 
 	// Set eip_fn_narg to the number of arguments taken by the function,
 	// or 0 if there was no containing function.
 	if (lfun < rfun)
 		for (lline = lfun + 1;
-		     lline < rfun && stabs[lline].n_type == N_PSYM;
-		     lline++)
+		     lline < rfun && stabs[lline].n_type == N_PSYM; lline++)
 			info->eip_fn_narg++;
 
 	return 0;

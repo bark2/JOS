@@ -22,7 +22,8 @@ fsipc(unsigned type, void *dstva)
 	static_assert(sizeof(fsipcbuf) == PGSIZE);
 
 	if (debug)
-		cprintf("[%08x] fsipc %d %08x\n", thisenv->env_id, type, *(uint32_t *)&fsipcbuf);
+		cprintf("[%08x] fsipc %d %08x\n", thisenv->env_id, type,
+			*(uint32_t *)&fsipcbuf);
 
 	ipc_send(fsenv, type, &fsipcbuf, PTE_P | PTE_W | PTE_U);
 	return ipc_recv(NULL, dstva, NULL);
@@ -34,16 +35,13 @@ static ssize_t devfile_write(struct Fd *fd, const void *buf, size_t n);
 static int devfile_stat(struct Fd *fd, struct Stat *stat);
 static int devfile_trunc(struct Fd *fd, off_t newsize);
 
-struct Dev devfile =
-{
-	.dev_id =	'f',
-	.dev_name =	"file",
-	.dev_read =	devfile_read,
-	.dev_close =	devfile_flush,
-	.dev_stat =	devfile_stat,
-	.dev_write =	devfile_write,
-	.dev_trunc =	devfile_trunc
-};
+struct Dev devfile = { .dev_id = 'f',
+		       .dev_name = "file",
+		       .dev_read = devfile_read,
+		       .dev_close = devfile_flush,
+		       .dev_stat = devfile_stat,
+		       .dev_write = devfile_write,
+		       .dev_trunc = devfile_trunc };
 
 // Open a file (or directory).
 //
@@ -127,7 +125,6 @@ devfile_read(struct Fd *fd, void *buf, size_t n)
 	return r;
 }
 
-
 // Write at most 'n' bytes from 'buf' to 'fd' at the current seek position.
 //
 // Returns:
@@ -141,7 +138,15 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
 	// remember that write is always allowed to write *fewer*
 	// bytes than requested.
 	// LAB 5: Your code here
-	panic("devfile_write not implemented");
+	int r;
+
+	fsipcbuf.write.req_fileid = fd->fd_file.id;
+	fsipcbuf.write.req_n = n;
+	memmove(fsipcbuf.write.req_buf, buf, n);
+	if ((r = fsipc(FSREQ_WRITE, NULL)) < 0)
+		return r;
+	assert(r  <= n);
+	return r;
 }
 
 static int
@@ -167,7 +172,6 @@ devfile_trunc(struct Fd *fd, off_t newsize)
 	return fsipc(FSREQ_SET_SIZE, NULL);
 }
 
-
 // Synchronize disk with buffer cache
 int
 sync(void)
@@ -177,4 +181,3 @@ sync(void)
 
 	return fsipc(FSREQ_SYNC, NULL);
 }
-

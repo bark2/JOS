@@ -30,6 +30,19 @@ sched_yield(void)
 
 	// LAB 4: Your code here.
 
+	if (!curenv)
+		idle = envs;
+	else
+		idle = envs + ((curenv + 1) - envs) % NENV;
+
+	do {
+		if (idle->env_status == ENV_RUNNABLE)
+			env_run(idle);
+		idle = envs + ((idle + 1) - envs) % NENV;
+	} while ((curenv && idle != curenv) || (!curenv && idle != envs));
+
+	if (curenv && curenv->env_status == ENV_RUNNING)
+		env_run(curenv);
 	// sched_halt never returns
 	sched_halt();
 }
@@ -69,15 +82,14 @@ sched_halt(void)
 	unlock_kernel();
 
 	// Reset stack pointer, enable interrupts and then halt.
-	asm volatile (
-		"movl $0, %%ebp\n"
-		"movl %0, %%esp\n"
-		"pushl $0\n"
-		"pushl $0\n"
-		"sti\n"
-		"1:\n"
-		"hlt\n"
-		"jmp 1b\n"
-	: : "a" (thiscpu->cpu_ts.ts_esp0));
+	asm volatile("movl $0, %%ebp\n"
+		     "movl %0, %%esp\n"
+		     "pushl $0\n"
+		     "pushl $0\n"
+		     "sti\n"
+		     "1:\n"
+		     "hlt\n"
+		     "jmp 1b\n"
+		     :
+		     : "a"(thiscpu->cpu_ts.ts_esp0));
 }
-

@@ -8,7 +8,6 @@
 
 #include "fs.h"
 
-
 #define debug 0
 
 // The file system server maintains three structures
@@ -30,20 +29,18 @@
 //    file IDs to struct OpenFile.
 
 struct OpenFile {
-	uint32_t o_fileid;	// file id
-	struct File *o_file;	// mapped descriptor for open file
-	int o_mode;		// open mode
-	struct Fd *o_fd;	// Fd page
+	uint32_t o_fileid;   // file id
+	struct File *o_file; // mapped descriptor for open file
+	int o_mode;	     // open mode
+	struct Fd *o_fd;     // Fd page
 };
 
 // Max number of open files in the file system at once
-#define MAXOPEN		1024
-#define FILEVA		0xD0000000
+#define MAXOPEN 1024
+#define FILEVA 0xD0000000
 
 // initialize to force into data section
-struct OpenFile opentab[MAXOPEN] = {
-	{ 0, 0, 1, 0 }
-};
+struct OpenFile opentab[MAXOPEN] = { { 0, 0, 1, 0 } };
 
 // Virtual address at which to receive page mappings containing client requests.
 union Fsipc *fsreq = (union Fsipc *)0x0ffff000;
@@ -55,7 +52,7 @@ serve_init(void)
 	uintptr_t va = FILEVA;
 	for (i = 0; i < MAXOPEN; i++) {
 		opentab[i].o_fileid = i;
-		opentab[i].o_fd = (struct Fd*) va;
+		opentab[i].o_fd = (struct Fd *)va;
 		va += PGSIZE;
 	}
 }
@@ -70,7 +67,8 @@ openfile_alloc(struct OpenFile **o)
 	for (i = 0; i < MAXOPEN; i++) {
 		switch (pageref(opentab[i].o_fd)) {
 		case 0:
-			if ((r = sys_page_alloc(0, opentab[i].o_fd, PTE_P|PTE_U|PTE_W)) < 0)
+			if ((r = sys_page_alloc(0, opentab[i].o_fd,
+						PTE_P | PTE_U | PTE_W)) < 0)
 				return r;
 			/* fall through */
 		case 1:
@@ -100,8 +98,8 @@ openfile_lookup(envid_t envid, uint32_t fileid, struct OpenFile **po)
 // permissions to return to the calling environment in *pg_store and
 // *perm_store respectively.
 int
-serve_open(envid_t envid, struct Fsreq_open *req,
-	   void **pg_store, int *perm_store)
+serve_open(envid_t envid, struct Fsreq_open *req, void **pg_store,
+	   int *perm_store)
 {
 	char path[MAXPATHLEN];
 	struct File *f;
@@ -110,11 +108,12 @@ serve_open(envid_t envid, struct Fsreq_open *req,
 	struct OpenFile *o;
 
 	if (debug)
-		cprintf("serve_open %08x %s 0x%x\n", envid, req->req_path, req->req_omode);
+		cprintf("serve_open %08x %s 0x%x\n", envid, req->req_path,
+			req->req_omode);
 
 	// Copy in the path, making sure it's null-terminated
 	memmove(path, req->req_path, MAXPATHLEN);
-	path[MAXPATHLEN-1] = 0;
+	path[MAXPATHLEN - 1] = 0;
 
 	// Find an open file ID
 	if ((r = openfile_alloc(&o)) < 0) {
@@ -134,7 +133,7 @@ serve_open(envid_t envid, struct Fsreq_open *req,
 			return r;
 		}
 	} else {
-try_open:
+	try_open:
 		if ((r = file_open(path, &f)) < 0) {
 			if (debug)
 				cprintf("file_open failed: %e", r);
@@ -166,12 +165,12 @@ try_open:
 	o->o_mode = req->req_omode;
 
 	if (debug)
-		cprintf("sending success, page %08x\n", (uintptr_t) o->o_fd);
+		cprintf("sending success, page %08x\n", (uintptr_t)o->o_fd);
 
 	// Share the FD page with the caller by setting *pg_store,
 	// store its permission in *perm_store
 	*pg_store = o->o_fd;
-	*perm_store = PTE_P|PTE_U|PTE_W|PTE_SHARE;
+	*perm_store = PTE_P | PTE_U | PTE_W | PTE_SHARE;
 
 	return 0;
 }
@@ -185,7 +184,8 @@ serve_set_size(envid_t envid, struct Fsreq_set_size *req)
 	int r;
 
 	if (debug)
-		cprintf("serve_set_size %08x %08x %08x\n", envid, req->req_fileid, req->req_size);
+		cprintf("serve_set_size %08x %08x %08x\n", envid,
+			req->req_fileid, req->req_size);
 
 	// Every file system IPC call has the same general structure.
 	// Here's how it goes.
@@ -211,12 +211,22 @@ serve_read(envid_t envid, union Fsipc *ipc)
 	struct Fsret_read *ret = &ipc->readRet;
 
 	if (debug)
-		cprintf("serve_read %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
+		cprintf("serve_read %08x %08x %08x\n", envid, req->req_fileid,
+			req->req_n);
 
 	// Lab 5: Your code here:
-	return 0;
-}
+	struct OpenFile *o;
+	int r;
 
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+
+	if ((r = file_read(o->o_file, ret->ret_buf, req->req_n,
+			   o->o_fd->fd_offset)) < 0)
+		return r;
+	o->o_fd->fd_offset += r;
+	return r;
+}
 
 // Write req->req_n bytes from req->req_buf to req_fileid, starting at
 // the current seek position, and update the seek position
@@ -226,10 +236,21 @@ int
 serve_write(envid_t envid, struct Fsreq_write *req)
 {
 	if (debug)
-		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
+		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid,
+			req->req_n);
 
 	// LAB 5: Your code here.
-	panic("serve_write not implemented");
+	struct OpenFile *o;
+	int r;
+
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+
+	if ((r = file_write(o->o_file, req->req_buf, req->req_n,
+			    o->o_fd->fd_offset)) < 0)
+		return r;
+	o->o_fd->fd_offset += r;
+	return r;
 }
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
@@ -270,7 +291,6 @@ serve_flush(envid_t envid, struct Fsreq_flush *req)
 	return 0;
 }
 
-
 int
 serve_sync(envid_t envid, union Fsipc *req)
 {
@@ -283,14 +303,14 @@ typedef int (*fshandler)(envid_t envid, union Fsipc *req);
 fshandler handlers[] = {
 	// Open is handled specially because it passes pages
 	/* [FSREQ_OPEN] =	(fshandler)serve_open, */
-	[FSREQ_READ] =		serve_read,
-	[FSREQ_STAT] =		serve_stat,
-	[FSREQ_FLUSH] =		(fshandler)serve_flush,
-	[FSREQ_WRITE] =		(fshandler)serve_write,
-	[FSREQ_SET_SIZE] =	(fshandler)serve_set_size,
-	[FSREQ_SYNC] =		serve_sync
+	[FSREQ_READ] = serve_read,
+	[FSREQ_STAT] = serve_stat,
+	[FSREQ_FLUSH] = (fshandler)serve_flush,
+	[FSREQ_WRITE] = (fshandler)serve_write,
+	[FSREQ_SET_SIZE] = (fshandler)serve_set_size,
+	[FSREQ_SYNC] = serve_sync
 };
-#define NHANDLERS (sizeof(handlers)/sizeof(handlers[0]))
+#define NHANDLERS (sizeof(handlers) / sizeof(handlers[0]))
 
 void
 serve(void)
@@ -301,10 +321,10 @@ serve(void)
 
 	while (1) {
 		perm = 0;
-		req = ipc_recv((int32_t *) &whom, fsreq, &perm);
+		req = ipc_recv((int32_t *)&whom, fsreq, &perm);
 		if (debug)
-			cprintf("fs req %d from %08x [page %08x: %s]\n",
-				req, whom, uvpt[PGNUM(fsreq)], fsreq);
+			cprintf("fs req %d from %08x [page %08x: %s]\n", req,
+				whom, uvpt[PGNUM(fsreq)], fsreq);
 
 		// All requests must contain an argument page
 		if (!(perm & PTE_P)) {
@@ -315,11 +335,13 @@ serve(void)
 
 		pg = NULL;
 		if (req == FSREQ_OPEN) {
-			r = serve_open(whom, (struct Fsreq_open*)fsreq, &pg, &perm);
+			r = serve_open(whom, (struct Fsreq_open *)fsreq, &pg,
+				       &perm);
 		} else if (req < NHANDLERS && handlers[req]) {
 			r = handlers[req](whom, fsreq);
 		} else {
-			cprintf("Invalid request code %d from %08x\n", req, whom);
+			cprintf("Invalid request code %d from %08x\n", req,
+				whom);
 			r = -E_INVAL;
 		}
 		ipc_send(whom, r, pg, perm);
@@ -340,7 +362,6 @@ umain(int argc, char **argv)
 
 	serve_init();
 	fs_init();
-        fs_test();
+	fs_test();
 	serve();
 }
-

@@ -1,8 +1,7 @@
 #include <inc/lib.h>
 
-#define BUFSIZ 1024		/* Find the buffer overrun bug! */
+#define BUFSIZ 1024 /* Find the buffer overrun bug! */
 int debug = 0;
-
 
 // gettoken(s, 0) prepares gettoken for subsequent calls and returns 0.
 // gettoken(0, token) parses a shell token from the previously set string,
@@ -12,14 +11,13 @@ int debug = 0;
 // tokens from the string.
 int gettoken(char *s, char **token);
 
-
 // Parse a shell command from string 's' and execute it.
 // Do not return until the shell command is finished.
 // runcmd() is called in a forked child,
 // so it's OK to manipulate file descriptor state.
 #define MAXARGS 16
 void
-runcmd(char* s)
+runcmd(char *s)
 {
 	char *argv[MAXARGS], *t, argv0buf[BUFSIZ];
 	int argc, c, i, r, p[2], fd, pipe_child;
@@ -31,8 +29,7 @@ again:
 	argc = 0;
 	while (1) {
 		switch ((c = gettoken(0, &t))) {
-
-		case 'w':	// Add an argument
+		case 'w': // Add an argument
 			if (argc == MAXARGS) {
 				cprintf("too many arguments\n");
 				exit();
@@ -40,7 +37,7 @@ again:
 			argv[argc++] = t;
 			break;
 
-		case '<':	// Input redirection
+		case '<': // Input redirection
 			// Grab the filename from the argument list
 			if (gettoken(0, &t) != 'w') {
 				cprintf("syntax error: < not followed by word\n");
@@ -55,16 +52,23 @@ again:
 			// then close the original 'fd'.
 
 			// LAB 5: Your code here.
-			panic("< redirection not implemented");
+			if ((fd = open(t, O_RDONLY)) < 0) {
+				cprintf("open %s for write: %e", t, fd);
+				exit();
+			}
+			if (fd) {
+				dup(fd, 0);
+				close(fd);
+			}
 			break;
 
-		case '>':	// Output redirection
+		case '>': // Output redirection
 			// Grab the filename from the argument list
 			if (gettoken(0, &t) != 'w') {
 				cprintf("syntax error: > not followed by word\n");
 				exit();
 			}
-			if ((fd = open(t, O_WRONLY|O_CREAT|O_TRUNC)) < 0) {
+			if ((fd = open(t, O_WRONLY | O_CREAT | O_TRUNC)) < 0) {
 				cprintf("open %s for write: %e", t, fd);
 				exit();
 			}
@@ -74,7 +78,7 @@ again:
 			}
 			break;
 
-		case '|':	// Pipe
+		case '|': // Pipe
 			if ((r = pipe(p)) < 0) {
 				cprintf("pipe: %e", r);
 				exit();
@@ -104,20 +108,19 @@ again:
 			panic("| not implemented");
 			break;
 
-		case 0:		// String is complete
+		case 0: // String is complete
 			// Run the current command!
 			goto runit;
 
 		default:
 			panic("bad return %d from gettoken", c);
 			break;
-
 		}
 	}
 
 runit:
 	// Return immediately if command line was empty.
-	if(argc == 0) {
+	if (argc == 0) {
 		if (debug)
 			cprintf("EMPTY COMMAND\n");
 		return;
@@ -143,7 +146,7 @@ runit:
 	}
 
 	// Spawn the command!
-	if ((r = spawn(argv[0], (const char**) argv)) < 0)
+	if ((r = spawn(argv[0], (const char **)argv)) < 0)
 		cprintf("spawn %s: %e\n", argv[0], r);
 
 	// In the parent, close all file descriptors and wait for the
@@ -151,7 +154,8 @@ runit:
 	close_all();
 	if (r >= 0) {
 		if (debug)
-			cprintf("[%08x] WAIT %s %08x\n", thisenv->env_id, argv[0], r);
+			cprintf("[%08x] WAIT %s %08x\n", thisenv->env_id,
+				argv[0], r);
 		wait(r);
 		if (debug)
 			cprintf("[%08x] wait finished\n", thisenv->env_id);
@@ -161,7 +165,8 @@ runit:
 	// wait for the right-hand part to finish.
 	if (pipe_child) {
 		if (debug)
-			cprintf("[%08x] WAIT pipe_child %08x\n", thisenv->env_id, pipe_child);
+			cprintf("[%08x] WAIT pipe_child %08x\n",
+				thisenv->env_id, pipe_child);
 		wait(pipe_child);
 		if (debug)
 			cprintf("[%08x] wait finished\n", thisenv->env_id);
@@ -170,7 +175,6 @@ runit:
 	// Done!
 	exit();
 }
-
 
 // Get the next token from string s.
 // Set *p1 to the beginning of the token and *p2 just past the token.
@@ -236,7 +240,7 @@ int
 gettoken(char *s, char **p1)
 {
 	static int c, nc;
-	static char* np1, *np2;
+	static char *np1, *np2;
 
 	if (s) {
 		nc = _gettoken(s, &np1, &np2);
@@ -247,7 +251,6 @@ gettoken(char *s, char **p1)
 	nc = _gettoken(np2, &np1, &np2);
 	return c;
 }
-
 
 void
 usage(void)
@@ -298,7 +301,7 @@ umain(int argc, char **argv)
 		if (buf == NULL) {
 			if (debug)
 				cprintf("EXITING\n");
-			exit();	// end of file
+			exit(); // end of file
 		}
 		if (debug)
 			cprintf("LINE: %s\n", buf);
@@ -319,4 +322,3 @@ umain(int argc, char **argv)
 			wait(r);
 	}
 }
-
