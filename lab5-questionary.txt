@@ -14,10 +14,10 @@
 
 === Q How much disk space can be addressed by a single bitmap block
 ===   when size of a block is 4KB? (number in _bytes_)
-128M
+134217728
 === Q How much disk space can be addressed by a single bitmap block
 ===   when size of a block is 512B? (number in _bytes_)
-2M
+2097152
 === Q What is a maximum supported file size in JOS FS? (number in _bytes_)
 4235264
 === Q Did you have to do anything else to ensure that the I/O
@@ -34,7 +34,7 @@ specific environment. Thus any other environment will not have this privilege le
 ====================================================================
 === Q What challenge(s) have you chosen to implement? (specify
 ===   challenge numbers separated by spaces, if more than one)
-exec
+4
 === Q If the challenge requires changing the kernel source, list the
 ===   files which you have changed/added during implementation.
 ===   (one file per line, relative to lab directory containing .git/)
