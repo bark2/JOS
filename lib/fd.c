@@ -122,7 +122,14 @@ fd_close(struct Fd *fd, bool must_exist)
 // File functions
 // --------------------------------------------------------------
 
-static struct Dev *devtab[] = { &devfile, &devpipe, &devcons, 0 };
+static struct Dev *devtab[] =
+{
+	&devfile,
+	&devsock,
+	&devpipe,
+	&devcons,
+	0
+};
 
 int
 dev_lookup(int dev_id, struct Dev **dev)

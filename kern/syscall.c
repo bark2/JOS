@@ -11,6 +11,8 @@
 #include <kern/syscall.h>
 #include <kern/console.h>
 #include <kern/sched.h>
+#include <kern/time.h>
+#include <kern/e1000.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -198,6 +200,7 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	struct Env *env;
 	int err;
 
+	/* cprintf("kernel: sys_page_alloc\n"); */
 	if ((err = envid2env(envid, &env, true)) < 0)
 		return err;
 
@@ -235,8 +238,7 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 //		address space.
 //	-E_NO_MEM if there's no memory to allocate any necessary page tables.
 static int
-sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva,
-	     int perm)
+sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int perm)
 {
 	// Hint: This function is a wrapper around page_lookup() and
 	//   page_insert() from kern/pmap.c.
@@ -357,8 +359,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 			return -E_INVAL;
 		if ((perm & PTE_W) && !(*src_pte & PTE_W))
 			return -E_INVAL;
-		if (page_insert(dst->env_pgdir, psrc, dst->env_ipc_dstva,
-				perm) < 0)
+		if (page_insert(dst->env_pgdir, psrc, dst->env_ipc_dstva, perm) < 0)
 			return -E_NO_MEM;
 		dst->env_ipc_perm = perm;
 	}
@@ -410,10 +411,42 @@ sys_exec(envid_t envid)
 	return env_exec(curenv, child);
 }
 
+// Return the current time.
+static int
+sys_time_msec(void)
+{
+	// LAB 6: Your code here.
+	return time_msec();
+}
+
+// LAB 6: Your code here.
+static int
+sys_packet_transmit(const void *packet, int len)
+{
+	user_mem_assert(curenv, packet, len, PTE_P);
+	return e1000_packet_transmit(packet, len);
+}
+
+static int
+sys_packet_receive(void *packet)
+{
+	int r;
+	user_mem_assert(curenv, packet, PGSIZE, PTE_P | PTE_W);
+
+	if ((r = packet_receive(curenv->env_pgdir, packet)) == E1000_RECV_SUCCESS)
+		return 0;
+	if (r < 0)
+		panic("e1000_packet_receive");
+
+	curenv->env_net_recving = true;
+	curenv->env_net_recv_packet = packet;
+	curenv->env_status = ENV_NOT_RUNNABLE;
+	return 0;
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
-syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4,
-	uint32_t a5)
+syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
 {
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
@@ -445,8 +478,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4,
 		return sys_page_alloc((envid_t)a1, (void *)a2, (int)a3);
 	} break;
 	case SYS_page_map: {
-		return sys_page_map((int32_t)a1, (void *)a2, (int)a3,
-				    (void *)a4, (int)a5);
+		return sys_page_map((int32_t)a1, (void *)a2, (int)a3, (void *)a4, (int)a5);
 	} break;
 	case SYS_page_unmap: {
 		return sys_page_unmap((int32_t)a1, (void *)a2);
@@ -455,18 +487,25 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4,
 		return sys_env_set_pgfault_upcall((envid_t)a1, (void *)a2);
 	} break;
 	case SYS_ipc_try_send: {
-		return sys_ipc_try_send((envid_t)a1, (uint32_t)a2, (void *)a3,
-					(unsigned)a4);
+		return sys_ipc_try_send((envid_t)a1, (uint32_t)a2, (void *)a3, (unsigned)a4);
 	} break;
 	case SYS_ipc_recv: {
 		return sys_ipc_recv((void *)a1);
 	} break;
 	case SYS_env_set_trapframe: {
-		return sys_env_set_trapframe((envid_t)a1,
-					     (struct Trapframe *)a2);
+		return sys_env_set_trapframe((envid_t)a1, (struct Trapframe *)a2);
 	}
 	case SYS_exec: {
 		return sys_exec((envid_t)a1);
+	}
+	case SYS_time_msec: {
+		return sys_time_msec();
+	}
+	case SYS_packet_transmit: {
+		return sys_packet_transmit((const uint8_t *)a1, (unsigned int)a2);
+	}
+	case SYS_packet_receive: {
+		sys_packet_receive((void *)a1);
 	}
 	default:
 		return -E_INVAL;

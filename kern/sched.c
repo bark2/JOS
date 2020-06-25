@@ -5,6 +5,7 @@
 #include <kern/pmap.h>
 #include <kern/monitor.h>
 
+static char *env_stat_str_map[] = { "FREE", " DYING", "RUNNABLE", "RUNNING", "NOT_RUNNABLE" };
 void sched_halt(void);
 
 // Choose a user environment to run and run it.
@@ -34,10 +35,11 @@ sched_yield(void)
 		idle = envs;
 	else
 		idle = envs + ((curenv + 1) - envs) % NENV;
-
 	do {
-		if (idle->env_status == ENV_RUNNABLE)
-			env_run(idle);
+		if (idle->env_id)
+			/* cprintf("sched: env_id: %d, stat: %s\n", idle->env_id, stats[idle->env_status]); */
+			if (idle->env_status == ENV_RUNNABLE)
+				env_run(idle);
 		idle = envs + ((idle + 1) - envs) % NENV;
 	} while ((curenv && idle != curenv) || (!curenv && idle != envs));
 
@@ -54,15 +56,25 @@ void
 sched_halt(void)
 {
 	int i;
+	bool runnable_exists = false;
+	bool only_not_runnable_exists = true;
 
 	// For debugging and testing purposes, if there are no runnable
 	// environments in the system, then drop into the kernel monitor.
 	for (i = 0; i < NENV; i++) {
-		if ((envs[i].env_status == ENV_RUNNABLE ||
-		     envs[i].env_status == ENV_RUNNING ||
-		     envs[i].env_status == ENV_DYING))
+		if (envs[i].env_status == ENV_NOT_RUNNABLE && envs[i].env_net_recving)
 			break;
+		if ((envs[i].env_status == ENV_RUNNABLE || envs[i].env_status == ENV_RUNNING ||
+		     /* envs[i].env_status == ENV_NOT_RUNNABLE || // Environment might be waiting for IPC or network */
+		     envs[i].env_status == ENV_DYING) &&
+		    envs[i].env_type == ENV_TYPE_USER) {
+			/* runnable_exists = true; */
+			break;
+		}
 	}
+	/* cprintf("\n%s\n\n", */
+	/* only_not_runnable_exists ? "only_not_runnable_exists = true" : "only_not_runnable_exists = false"); */
+	/* if (!runnable_exists || only_not_runnable_exists) { */
 	if (i == NENV) {
 		cprintf("No runnable environments in the system!\n");
 		while (1)

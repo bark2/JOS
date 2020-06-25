@@ -1,3 +1,4 @@
+#include "e1000.h"
 #include <inc/mmu.h>
 #include <inc/x86.h>
 #include <inc/assert.h>
@@ -14,6 +15,7 @@
 #include <kern/picirq.h>
 #include <kern/cpu.h>
 #include <kern/spinlock.h>
+#include <kern/time.h>
 
 static struct Taskstate ts;
 
@@ -32,28 +34,26 @@ struct Pseudodesc idt_pd = { sizeof(idt) - 1, (uint32_t)idt };
 static const char *
 trapname(int trapno)
 {
-	static const char *const excnames[] = {
-		"Divide error",
-		"Debug",
-		"Non-Maskable Interrupt",
-		"Breakpoint",
-		"Overflow",
-		"BOUND Range Exceeded",
-		"Invalid Opcode",
-		"Device Not Available",
-		"Double Fault",
-		"Coprocessor Segment Overrun",
-		"Invalid TSS",
-		"Segment Not Present",
-		"Stack Fault",
-		"General Protection",
-		"Page Fault",
-		"(unknown trap)",
-		"x87 FPU Floating-Point Error",
-		"Alignment Check",
-		"Machine-Check",
-		"SIMD Floating-Point Exception"
-	};
+	static const char *const excnames[] = { "Divide error",
+						"Debug",
+						"Non-Maskable Interrupt",
+						"Breakpoint",
+						"Overflow",
+						"BOUND Range Exceeded",
+						"Invalid Opcode",
+						"Device Not Available",
+						"Double Fault",
+						"Coprocessor Segment Overrun",
+						"Invalid TSS",
+						"Segment Not Present",
+						"Stack Fault",
+						"General Protection",
+						"Page Fault",
+						"(unknown trap)",
+						"x87 FPU Floating-Point Error",
+						"Alignment Check",
+						"Machine-Check",
+						"SIMD Floating-Point Exception" };
 
 	if (trapno < sizeof(excnames) / sizeof(excnames[0]))
 		return excnames[trapno];
@@ -90,6 +90,7 @@ void trap_irq_kbd();
 void trap_irq_serial();
 void trap_irq_spurious();
 void trap_irq_ide();
+void trap_irq_e1000();
 
 void
 trap_init(void)
@@ -122,6 +123,7 @@ trap_init(void)
 	SETGATE(idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, trap_irq_kbd, 0);
 	SETGATE(idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, trap_irq_serial, 0);
 	SETGATE(idt[IRQ_OFFSET + IRQ_SPURIOUS], 0, GD_KT, trap_irq_spurious, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_E1000], 0, GD_KT, trap_irq_e1000, 0);
 	SETGATE(idt[IRQ_OFFSET + IRQ_IDE], 0, GD_KT, trap_irq_ide, 0);
 
 	// Per-CPU setup
@@ -157,14 +159,11 @@ trap_init_percpu(void)
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
-	thiscpu->cpu_ts.ts_esp0 =
-		(uintptr_t)percpu_kstacks[cpunum()] + KSTKSIZE + KSTKGAP;
+	thiscpu->cpu_ts.ts_esp0 = (uintptr_t)percpu_kstacks[cpunum()] + KSTKSIZE + KSTKGAP;
 	thiscpu->cpu_ts.ts_ss0 = GD_KD;
 
 	// Initialize the TSS slot of the gdt.
-	gdt[(GD_TSS0 >> 3) + cpunum()] =
-		SEG16(STS_T32A, (uint32_t)(&thiscpu->cpu_ts),
-		      sizeof(struct Taskstate) - 1, 0);
+	gdt[(GD_TSS0 >> 3) + cpunum()] = SEG16(STS_T32A, (uint32_t)(&thiscpu->cpu_ts), sizeof(struct Taskstate) - 1, 0);
 	gdt[(GD_TSS0 >> 3) + cpunum()].sd_s = 0;
 
 	// Load the TSS selector (like other segment selectors, the
@@ -193,8 +192,7 @@ print_trapframe(struct Trapframe *tf)
 	// W/R=a write/read caused the fault
 	// PR=a protection violation caused the fault (NP=page not present).
 	if (tf->tf_trapno == T_PGFLT)
-		cprintf(" [%s, %s, %s]\n", tf->tf_err & 4 ? "user" : "kernel",
-			tf->tf_err & 2 ? "write" : "read",
+		cprintf(" [%s, %s, %s]\n", tf->tf_err & 4 ? "user" : "kernel", tf->tf_err & 2 ? "write" : "read",
 			tf->tf_err & 1 ? "protection" : "not-present");
 	else
 		cprintf("\n");
@@ -223,6 +221,7 @@ print_regs(struct PushRegs *regs)
 static void
 trap_dispatch(struct Trapframe *tf)
 {
+	int i, err;
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
 	switch (tf->tf_trapno) {
@@ -240,9 +239,8 @@ trap_dispatch(struct Trapframe *tf)
 		return;
 	} break;
 	case T_SYSCALL: {
-		int32_t err = syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
-				      tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
-				      tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
+		int32_t err = syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx, tf->tf_regs.reg_ecx,
+				      tf->tf_regs.reg_ebx, tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
 		tf->tf_regs.reg_eax = err;
 		return;
 	} break;
@@ -260,8 +258,30 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
+
+	// Add time tick increment to clock interrupts.
+	// Be careful! In multiprocessors, clock interrupts are
+	// triggered on every CPU.
+	// LAB 6: Your code here.
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+		time_tick();
 		lapic_eoi();
+		return;
+	}
+
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_E1000) {
+		e1000_packet_receive();
+		lapic_eoi();
+		irq_eoi();
+
+		for (i = 0; i < NENV; i++) {
+			if (envs[i].env_net_recving &&
+			    !packet_receive(envs[i].env_pgdir, envs[i].env_net_recv_packet)) {
+				envs[i].env_net_recving = false;
+				envs[i].env_status = ENV_RUNNABLE;
+				break;
+			}
+		}
 		return;
 	}
 
@@ -394,18 +414,13 @@ page_fault_handler(struct Trapframe *tf)
 
 	// Destroy the environment that caused the fault.
 	if (curenv->env_pgfault_upcall) {
-		uintptr_t xesp = UXSTACKTOP -
-				 (sizeof(int32_t) + sizeof(struct UTrapframe));
-		if (tf->tf_esp < UXSTACKTOP &&
-		    tf->tf_esp >= UXSTACKTOP - PGSIZE) {
-			xesp = tf->tf_esp -
-			       (sizeof(int32_t) + sizeof(struct UTrapframe));
+		uintptr_t xesp = UXSTACKTOP - (sizeof(int32_t) + sizeof(struct UTrapframe));
+		if (tf->tf_esp < UXSTACKTOP && tf->tf_esp >= UXSTACKTOP - PGSIZE) {
+			xesp = tf->tf_esp - (sizeof(int32_t) + sizeof(struct UTrapframe));
 		}
-		
+
 		/* print_trapframe(tf); */
-		user_mem_assert(curenv, (void *)xesp,
-				sizeof(int32_t) + sizeof(struct UTrapframe),
-				PTE_W);
+		user_mem_assert(curenv, (void *)xesp, sizeof(int32_t) + sizeof(struct UTrapframe), PTE_W);
 		struct UTrapframe utf;
 		utf.utf_fault_va = fault_va;
 		utf.utf_err = tf->tf_err;
@@ -421,8 +436,7 @@ page_fault_handler(struct Trapframe *tf)
 		env_run(curenv);
 	}
 
-	cprintf("[%08x] user fault va %08x ip %08x\n", curenv->env_id, fault_va,
-		tf->tf_eip);
+	cprintf("[%08x] user fault va %08x ip %08x\n", curenv->env_id, fault_va, tf->tf_eip);
 	print_trapframe(tf);
 	env_destroy(curenv);
 }
