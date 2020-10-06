@@ -9,7 +9,7 @@ except ImportError:
     from urllib.error import HTTPError
 from gradelib import *
 
-r = Runner(save("jos.out"),
+r = Runner(save("jos.out.mine"),
            stop_breakpoint("readline"))
 
 def match_packet_seq(got, expect):
@@ -130,8 +130,8 @@ end_part("A")
 #
 
 def test_testinput_helper(count):
-    save_pcap_on_fail()
-    maybe_unlink("qemu.pcap")
+    # save_pcap_on_fail()
+    # maybe_unlink("qemu.pcap")
 
     def send_packets():
         # Send 'count' UDP packets
@@ -301,10 +301,9 @@ def mk_test_httpd(url, expect_code, expect_data):
                 no=[".*panic"])
     test_httpd_test.__name__ += url.replace("/", "-")
     return test(10, fullurl, parent=test_httpd)(test_httpd_test)
-mk_test_httpd("/", 404, "")
-mk_test_httpd("/index.html", 200, open("fs/index.html").read())
-mk_test_httpd("/random_file.txt", 404, "")
 
-end_part("B")
-
-run_tests()
+# Send 'count' UDP packets
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.connect(("127.0.0.1", echo_port))
+for i in range(5):
+    sock.send(ascii_to_bytes("Packet %03d" % i))
