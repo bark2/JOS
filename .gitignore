@@ -10,10 +10,14 @@
 /qemu.pcap.*
 /qemu.out
 /qemu.log
-/gradelib.pyc
 /lab?-handin.tar.gz
 /lab?/
 /sol?/
 .suf
 cscope.*
-/.clangd
+/.*
+/__pycache__
+/user
+*grade*
+*txt*
+.dir-locals.el
