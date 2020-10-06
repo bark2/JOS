@@ -18,6 +18,6 @@ cscope.*
 /.*
 /__pycache__
 /user
-*grade*
-*txt*
-.dir-locals.el
+/*grade*
+/*txt*
+/.dir-locals.el
